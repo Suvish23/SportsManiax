@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const slugify = require('slugify');
 
 const ProfileSchema = new mongoose.Schema({
   Name: {
@@ -12,7 +13,7 @@ const ProfileSchema = new mongoose.Schema({
     type: String,
     default: 'no-photo.jpg',
   },
-  FavoritePlayer: {
+  FavouritePlayer: {
     type: String,
     required: [true, 'Pleases type your Favourite Player'],
     maxlength: [500, 'description cannot be more than 500 characters'],
@@ -20,6 +21,9 @@ const ProfileSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
+    match: [
+      /^\s*(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})(?: *x(\d+))?\s*$/,
+    ],
     maxlength: [20, 'Phone number can not be longer than 20 characters'],
   },
   email: {
@@ -29,6 +33,7 @@ const ProfileSchema = new mongoose.Schema({
       'please add a valid email',
     ],
   },
+  slug: String,
   Country: String,
   City: String,
   Profession: {

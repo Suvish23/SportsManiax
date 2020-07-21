@@ -10,7 +10,7 @@ dotenv.config({ path: './config/config.env' });
 //Connect to database
 connectDB();
 //route files
-
+const Boot = require('./router/Player');
 const Bootcamps = require('./router/Fan');
 //load env vars
 
@@ -24,7 +24,7 @@ app.use(express.json());
 // }
 
 //Mount routers
-
+app.use('/api/v1/Player', Boot);
 app.use('/api/v1/Fan', Bootcamps);
 
 app.use(errorHandler);

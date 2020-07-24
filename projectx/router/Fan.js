@@ -8,7 +8,8 @@ const {
   deleteProfile,
 } = require('../controllers/response');
 const router = express.Router();
-router.route('/').post(createFanProfile).get(getprofiles);
+const { protect } = require('../middelware/auth');
+router.route('/').get(getprofiles).post(protect, createFanProfile);
 router
   .route('/:id')
   .get(getFanAttribute)

@@ -1,11 +1,62 @@
 const Attributes = require('../models/player');
 const asyncHandler = require('../middelware/async');
+const ErrorRespone = require('../utils/errorresponse');
+const player = require('../models/player');
 
 exports.getplayers = asyncHandler(async (req, res, next) => {
-  const players = await Attributes.find();
+  let query;
+  let reqQuery = { ...req.query };
+  //fields to exclude
+  const removeFields = ['select', 'sort', 'page', 'limit'];
+  //loop over removeFields and delete then from reqQuery
+  removeFields.forEach((param) => delete reqQuery[param]);
+
+  //incase to search for specific item in DB
+  let querystr = JSON.stringify(reqQuery);
+  querystr = querystr.replace(
+    /\b(gt|gte|lt|lte|in)\b/g,
+    (match) => `$${match}`
+  );
+  // console.log(req.query);
+  query = Attributes.find(JSON.parse(querystr));
+  //Select Fields
+  if (req.query.select) {
+    const fields = req.query.select.split(',').join(' ');
+    query = query.select(fields);
+  }
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(',').join(' ');
+    query = query.sort(sortBy);
+  }
+
+  //Pagination
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 25;
+  const startIndex = (page - 1) * limit;
+  const endIndex = page * limit;
+  const total = await Attributes.countDocuments();
+  query = query.skip(startIndex).limit(limit);
+  //Executing query
+  const players = await query;
+  //Pagination result
+  const pagination = {};
+
+  if (endIndex < total) {
+    pagination.next = {
+      page: page + 1,
+      limit,
+    };
+  }
+  if (startIndex > 0) {
+    pagination.prev = {
+      page: page - 1,
+      limit,
+    };
+  }
   res.status(200).json({
     count: players.length,
     sucess: true,
+    pagination: pagination,
     data: players,
   });
 });

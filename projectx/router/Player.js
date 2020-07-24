@@ -8,6 +8,7 @@ const {
   deleteplayer,
 } = require('../controllers/Playerresponse');
 const router = express.Router();
+const { protect } = require('../middelware/auth');
 router.route('/').post(createplayer).get(getplayers);
 router.route('/:id').get(getplayer).delete(deleteplayer).put(updateplayer);
 

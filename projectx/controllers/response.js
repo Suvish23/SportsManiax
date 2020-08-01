@@ -6,62 +6,7 @@ const player = require('../models/player');
 const path = require('path');
 
 exports.getprofiles = asyncHandler(async (req, res, next) => {
-  let query;
-  let reqQuery = { ...req.query };
-  //fields to exclude
-  const removeFields = ['select', 'sort', 'page', 'limit'];
-  //loop over removeFields and delete then from reqQuery
-  removeFields.forEach((param) => delete reqQuery[param]);
-
-  //incase to search for specific item in DB
-  let querystr = JSON.stringify(reqQuery);
-  querystr = querystr.replace(
-    /\b(gt|gte|lt|lte|in)\b/g,
-    (match) => `$${match}`
-  );
-  // console.log(req.query);
-  query = Profile.find(JSON.parse(querystr));
-  //Select Fields
-  if (req.query.select) {
-    const fields = req.query.select.split(',').join(' ');
-    query = query.select(fields);
-  }
-  if (req.query.sort) {
-    const sortBy = req.query.sort.split(',').join(' ');
-    query = query.sort(sortBy);
-  }
-
-  //Pagination
-  const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 25;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  const total = await Profile.countDocuments();
-  query = query.skip(startIndex).limit(limit);
-  //Executing query
-  const Attributess = await query;
-  //Pagination result
-  const pagination = {};
-
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit,
-    };
-  }
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit,
-    };
-  }
-
-  res.status(200).json({
-    count: Attributess.length,
-    sucess: true,
-    pagination: pagination,
-    data: Attributess,
-  });
+  res.status(200).json(res.advancedResults);
 });
 exports.getFanAttribute = asyncHandler(async (req, res, next) => {
   const Attribute = await Profile.findById(req.params.id);
@@ -81,6 +26,16 @@ exports.getFanAttribute = asyncHandler(async (req, res, next) => {
 });
 //@access  Private
 exports.createFanProfile = asyncHandler(async (req, res, next) => {
+  //Add user to req.body
+  req.body.user = req.user.id;
+  //check for published profiles
+  const createdfan = await Profile.findOne({ user: req.user.id });
+  //if the user is not a admin ,they can only add one profile
+  if (createdfan && req.user.role !== 'admin') {
+    return next(
+      new ErrorRespone(`Fan with ID${req.user.id} has already created`, 400)
+    );
+  }
   const fan = await Profile.create(req.body);
   res.status(201).json({
     success: true,
@@ -91,11 +46,39 @@ exports.createFanProfile = asyncHandler(async (req, res, next) => {
 //@route PUT /api/v1/bootcamps/:id
 //@access  Private
 exports.updateFanProfile = asyncHandler(async (req, res, next) => {
-  const update = await Profile.findByIdAndUpdate(req.params.id, req.body, {
-    runValidators: true,
-    new: true,
-  });
+  let update = await Profile.findById(req.params.id);
   if (!update) {
+    return next(
+      new ErrorRespone(
+        `Fan not found with id of ${req.params.id} at the database`,
+        404
+      )
+    );
+  }
+  //make sure user is bootcamp owner
+  if (update.user.toString() !== req.user.id && req.user.role !== 'admin') {
+    return next(
+      new ErrorRespone(
+        `user ${req.params.id} is not authorized to update this Profile`,
+        401
+      )
+    );
+  }
+  update = await Profile.findOneAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  res.status(200).json({
+    success: true,
+    data: update,
+  });
+});
+// @des    Delete Profile
+//@route Delete /api/v1/bootcamps/:id
+//@access  Public
+exports.deleteProfile = asyncHandler(async (req, res, next) => {
+  const del = await Profile.findByIdAndDelete(req.params.id);
+  if (!del) {
     return next(
       new ErrorRespone(
         `Bootcamp not found with id of ${req.params.id} at the database`,
@@ -104,24 +87,15 @@ exports.updateFanProfile = asyncHandler(async (req, res, next) => {
     );
   }
   res.status(200).json({
-    success: true,
-    data: {},
-  });
-});
-// @des    Delete Profile
-//@route Delete /api/v1/bootcamps/:id
-//@access  Public
-exports.deleteProfile = asyncHandler(async (req, res, next) => {
-  const del = await Profile.findByIdAndDelete(req.params.id);
-  res.status(200).json({
     sucess: true,
     data: {},
   });
-  if (!del) {
+  //make sure user is bootcamp owner
+  if (del.user.toString() !== req.user.id && req.user.role !== 'admin') {
     return next(
       new ErrorRespone(
-        `Bootcamp not found with id of ${req.params.id} at the database`,
-        404
+        `user ${req.params.id} is not authorized to delete this Profile`,
+        401
       )
     );
   }
